@@ -4,17 +4,22 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:warehouse_management_app/data/reposotories/product_repository.dart';
 import 'package:warehouse_management_app/data/reposotories/stock_repository.dart';
-import '../../../data/models/product_model.dart';
+import 'package:warehouse_management_app/data/reposotories/supplier_repository.dart';
+import '../../../../data/models/product_model.dart';
+
 
 class StockInController extends GetxController {
   final ProductRepository _productRepository;
   final StockRepository _stockRepository;
+  final SupplierRepository _supplierRepository;
 
   StockInController({
     required ProductRepository productRepository,
     required StockRepository stockRepository,
+    required SupplierRepository supplierRepository,
   })  : _productRepository = productRepository,
-        _stockRepository = stockRepository;
+        _stockRepository = stockRepository,
+        _supplierRepository = supplierRepository;
 
   // Form
   final formKey = GlobalKey<FormState>();
@@ -22,17 +27,22 @@ class StockInController extends GetxController {
   // State
   final isLoading = false.obs;
   final isSubmitting = false.obs;
+  final isLoadingSuppliers = false.obs;
 
   // Data
   final selectedProduct = Rxn<ProductModel>();
   final suppliers = <Map<String, dynamic>>[].obs;
   final selectedSupplier = Rxn<String>();
+  final selectedSupplierName = ''.obs;
   final selectedDate = Rxn<DateTime>();
 
   // Controllers
   final quantityController = TextEditingController();
   final referenceController = TextEditingController();
   final notesController = TextEditingController();
+
+  // Flag to track if product is from details screen
+  final isProductFromDetails = false.obs;
 
   @override
   void onInit() {
@@ -43,6 +53,11 @@ class StockInController extends GetxController {
     // Check if product passed from details screen
     if (Get.arguments != null && Get.arguments['product'] != null) {
       selectedProduct.value = Get.arguments['product'];
+      isProductFromDetails.value = true;
+      print("Product from details: ${selectedProduct.value!.name}");
+    } else {
+      isProductFromDetails.value = false;
+      print("Direct menu - no product selected");
     }
   }
 
@@ -54,30 +69,76 @@ class StockInController extends GetxController {
     super.onClose();
   }
 
-  void loadSuppliers() {
-    // Mock suppliers
-    suppliers.value = [
-      {'id': 'sup1', 'name': 'Mobile World'},
-      {'id': 'sup2', 'name': 'Medico Pharma'},
-      {'id': 'sup3', 'name': 'Tools World'},
-      {'id': 'sup4', 'name': 'Fashion Hub'},
-    ];
+  Future<void> loadSuppliers() async {
+    try {
+      isLoadingSuppliers.value = true;
+      final fetchedSuppliers = await _supplierRepository.getSuppliers();
+      suppliers.value = fetchedSuppliers;
+    } catch (e) {
+      print('Error loading suppliers: $e');
+    } finally {
+      isLoadingSuppliers.value = false;
+    }
   }
 
-  void selectProduct() async {
-    // Navigate to product search screen
+  // 🔥 UPDATED: Product select method - navigates to search screen
+  Future<void> selectProduct() async {
+    // Agar product details se aaya hai to search nahi karega
+    if (isProductFromDetails.value) {
+      Get.snackbar(
+        'Info',
+        'Product already selected from details',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.blue,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 1),
+      );
+      return;
+    }
+
+    // Navigate to product search screen and wait for result
     final result = await Get.toNamed('/admin/products/search');
+    
     if (result != null && result is ProductModel) {
       selectedProduct.value = result;
+      
+      Get.snackbar(
+        'Product Selected',
+        '${result.name} selected',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 1),
+      );
     }
   }
 
   void clearSelectedProduct() {
+    if (isProductFromDetails.value) {
+      Get.snackbar(
+        'Info',
+        'Product from details cannot be cleared',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    
     selectedProduct.value = null;
   }
 
   void selectSupplier(String? supplierId) {
-    selectedSupplier.value = supplierId;
+    if (supplierId != null) {
+      final supplier = suppliers.firstWhereOrNull((s) => s['id'] == supplierId);
+      if (supplier != null) {
+        selectedSupplier.value = supplierId;
+        selectedSupplierName.value = supplier['name'] ?? '';
+      }
+    } else {
+      selectedSupplier.value = null;
+      selectedSupplierName.value = '';
+    }
   }
 
   Future<void> selectDate() async {
@@ -107,10 +168,8 @@ class StockInController extends GetxController {
   }
 
   Future<void> submitStockIn() async {
-    // Validate form
     if (!formKey.currentState!.validate()) return;
 
-    // Validate product selected
     if (selectedProduct.value == null) {
       Get.snackbar(
         'Error',
@@ -125,42 +184,33 @@ class StockInController extends GetxController {
     try {
       isSubmitting.value = true;
 
-      // Create stock movement record
-      final movement = {
-        'productId': selectedProduct.value!.id,
-        'productName': selectedProduct.value!.name,
-        'type': 'stock_in',
-        'quantity': int.parse(quantityController.text),
-        'supplierId': selectedSupplier.value,
-        'reference': referenceController.text,
-        'date': selectedDate.value?.toIso8601String(),
-        'notes': notesController.text,
-        'userId': 'current_user_id', // Get from auth
-      };
-
-      // Update product stock
-      final updatedProduct = selectedProduct.value!.copyWith(
-        currentStock: selectedProduct.value!.currentStock + int.parse(quantityController.text),
+      final result = await _stockRepository.addStock(
+        productId: selectedProduct.value!.id,
+        quantity: int.parse(quantityController.text),
+        reason: 'purchase',
+        supplierId: selectedSupplier.value,
+        supplierName: selectedSupplierName.value.isNotEmpty ? selectedSupplierName.value : null,
+        reference: referenceController.text.isNotEmpty ? referenceController.text : null,
+        notes: notesController.text.isNotEmpty ? notesController.text : null,
       );
-
-      await _productRepository.updateProduct(updatedProduct);
-      await _stockRepository.addMovement(movement);
 
       Get.snackbar(
         'Success',
-        'Stock added successfully',
+        result['message'] ?? 'Stock added successfully',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.green,
         colorText: Colors.white,
+        duration: const Duration(seconds: 2),
       );
 
-      // Go back and refresh
-      Get.back(result: true);
+      Future.delayed(const Duration(milliseconds: 500), () {
+        Get.back(result: true);
+      });
       
     } catch (e) {
       Get.snackbar(
         'Error',
-        'Failed to add stock: $e',
+        e.toString(),
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,

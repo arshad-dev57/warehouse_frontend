@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:warehouse_management_app/data/reposotories/product_repository.dart';
 import 'package:warehouse_management_app/data/reposotories/stock_repository.dart';
-import '../../../data/models/product_model.dart';
 
+import '../../../data/models/product_model.dart';
 
 class StockOutController extends GetxController {
   final ProductRepository _productRepository;
@@ -35,6 +35,9 @@ class StockOutController extends GetxController {
   final referenceController = TextEditingController();
   final notesController = TextEditingController();
 
+  // Flag to track if product is from details screen
+  final isProductFromDetails = false.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -44,6 +47,11 @@ class StockOutController extends GetxController {
     // Check if product passed from details screen
     if (Get.arguments != null && Get.arguments['product'] != null) {
       selectedProduct.value = Get.arguments['product'];
+      isProductFromDetails.value = true;
+      print("Product from details: ${selectedProduct.value!.name}");
+    } else {
+      isProductFromDetails.value = false;
+      print("Direct menu - no product selected");
     }
   }
 
@@ -65,14 +73,50 @@ class StockOutController extends GetxController {
     ];
   }
 
-  void selectProduct() async {
+  // 🔥 Product select method - navigates to search screen
+  Future<void> selectProduct() async {
+    // Agar product details se aaya hai to search nahi karega
+    if (isProductFromDetails.value) {
+      Get.snackbar(
+        'Info',
+        'Product already selected from details',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.blue,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 1),
+      );
+      return;
+    }
+
+    // Navigate to product search screen and wait for result
     final result = await Get.toNamed('/admin/products/search');
+    
     if (result != null && result is ProductModel) {
       selectedProduct.value = result;
+      
+      Get.snackbar(
+        'Product Selected',
+        '${result.name} selected',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 1),
+      );
     }
   }
 
   void clearSelectedProduct() {
+    if (isProductFromDetails.value) {
+      Get.snackbar(
+        'Info',
+        'Product from details cannot be cleared',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    
     selectedProduct.value = null;
   }
 
@@ -126,30 +170,18 @@ class StockOutController extends GetxController {
     try {
       isSubmitting.value = true;
 
-      final movement = {
-        'productId': selectedProduct.value!.id,
-        'productName': selectedProduct.value!.name,
-        'type': 'stock_out',
-        'reason': selectedReason.value,
-        'quantity': int.parse(quantityController.text),
-        'reference': referenceController.text,
-        'date': selectedDate.value?.toIso8601String(),
-        'notes': notesController.text,
-        'userId': 'current_user_id',
-      };
-
-      final updatedProduct = selectedProduct.value!.copyWith(
-        currentStock: selectedProduct.value!.currentStock - 
-                     int.parse(quantityController.text),
-        updatedAt: DateTime.now(),
+      // Call Stock Out API
+      final result = await _stockRepository.removeStock(
+        productId: selectedProduct.value!.id,
+        quantity: int.parse(quantityController.text),
+        reason: selectedReason.value!,
+        reference: referenceController.text.isNotEmpty ? referenceController.text : null,
+        notes: notesController.text.isNotEmpty ? notesController.text : null,
       );
-
-      await _productRepository.updateProduct(updatedProduct);
-      await _stockRepository.addMovement(movement);
 
       Get.snackbar(
         'Success',
-        'Stock removed successfully',
+        result['message'] ?? 'Stock removed successfully',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.green,
         colorText: Colors.white,

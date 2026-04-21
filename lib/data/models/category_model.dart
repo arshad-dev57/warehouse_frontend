@@ -23,7 +23,7 @@ class CategoryModel {
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
     return CategoryModel(
-      id: json['id'] ?? '',
+      id: json['_id'] ?? json['id'] ?? '',  // 👈 DONO FORMAT CHECK KARO
       name: json['name'] ?? '',
       description: json['description'],
       color: _getColorFromString(json['color'] ?? 'blue'),

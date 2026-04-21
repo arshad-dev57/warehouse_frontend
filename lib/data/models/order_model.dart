@@ -13,13 +13,13 @@ extension OrderStatusExtension on OrderStatus {
   String get name {
     switch (this) {
       case OrderStatus.pending:
-        return 'Pending';
+        return 'pending';
       case OrderStatus.processing:
-        return 'Processing';
+        return 'processing';
       case OrderStatus.completed:
-        return 'Completed';
+        return 'completed';
       case OrderStatus.cancelled:
-        return 'Cancelled';
+        return 'cancelled';
     }
   }
 
@@ -79,11 +79,11 @@ class OrderItem {
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
     return OrderItem(
-      productId: json['productId'],
-      productName: json['productName'],
-      productSku: json['productSku'],
-      quantity: json['quantity'],
-      price: json['price'].toDouble(),
+      productId: json['productId']?.toString() ?? '',
+      productName: json['productName']?.toString() ?? '',
+      productSku: json['productSku']?.toString() ?? '',
+      quantity: json['quantity'] ?? 0,
+      price: (json['price'] ?? 0).toDouble(),
     );
   }
 }
@@ -147,22 +147,39 @@ class OrderModel {
   }
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
+    // 🔥 FIXED: Handle createdBy which can be either String or Object
+    String createdBy = '';
+    
+    if (json['createdBy'] is Map) {
+      // If createdBy is an object with user details (from populate)
+      final userObj = json['createdBy'] as Map<String, dynamic>;
+      createdBy = userObj['name']?.toString() ?? userObj['email']?.toString() ?? 'Unknown';
+      print("👤 User object found: $createdBy"); // Debug
+    } else {
+      // If createdBy is just a string ID (fallback)
+      createdBy = json['createdBy']?.toString() ?? 'Unknown';
+      print("🆔 User ID only: $createdBy"); // Debug
+    }
+
     return OrderModel(
-      id: json['id'],
-      orderNumber: json['orderNumber'],
-      orderDate: DateTime.parse(json['orderDate']),
-      customerName: json['customerName'],
-      customerPhone: json['customerPhone'],
-      customerAddress: json['customerAddress'],
-      items: (json['items'] as List).map((item) => OrderItem.fromJson(item)).toList(),
-      status: OrderStatus.values[json['status']],
-      subtotal: json['subtotal'].toDouble(),
-      discount: json['discount']?.toDouble() ?? 0,
-      total: json['total'].toDouble(),
-      notes: json['notes'],
-      createdBy: json['createdBy'],
-      createdAt: DateTime.parse(json['createdAt']),
-      completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt']) : null,
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
+      orderNumber: json['orderNumber']?.toString() ?? 'ORD-000',
+      orderDate: DateTime.tryParse(json['orderDate'] ?? '') ?? DateTime.now(),
+      customerName: json['customerName']?.toString(),
+      customerPhone: json['customerPhone']?.toString(),
+      customerAddress: json['customerAddress']?.toString(),
+      items: (json['items'] as List?)?.map((item) => OrderItem.fromJson(item)).toList() ?? [],
+      status: OrderStatus.values.firstWhere(
+        (e) => e.name.toLowerCase() == json['status']?.toString().toLowerCase(),
+        orElse: () => OrderStatus.pending,
+      ),
+      subtotal: (json['subtotal'] ?? 0).toDouble(),
+      discount: (json['discount'] ?? 0).toDouble(),
+      total: (json['total'] ?? 0).toDouble(),
+      notes: json['notes']?.toString(),
+      createdBy: createdBy,
+      createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
+      completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt']) : null,
     );
   }
 }

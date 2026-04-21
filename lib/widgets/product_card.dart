@@ -130,7 +130,7 @@ class ProductCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '₹${product.sellingPrice.toStringAsFixed(0)}',
+                            '\$${product.sellingPrice.toStringAsFixed(0)}',
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,

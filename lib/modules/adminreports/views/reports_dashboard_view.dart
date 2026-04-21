@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:warehouse_management_app/core/routes/app_pages.dart';
 import 'package:warehouse_management_app/modules/adminreports/controllers/admin_report_controller.dart';
+import 'package:warehouse_management_app/modules/adminreports/views/sales_report_view.dart';
 import 'package:warehouse_management_app/widgets/report_card.dart';
 import '../../../widgets/loading_widget.dart';
 
@@ -144,7 +145,7 @@ class ReportsDashboardView extends GetView<ReportsController> {
         Expanded(
           child: _buildSummaryCard(
             title: 'Total Value',
-            value: '₹${controller.totalStockValue}',
+            value: '\$${controller.totalStockValue}',
             icon: Icons.currency_rupee,
             color: Colors.green,
           ),

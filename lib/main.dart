@@ -3,7 +3,8 @@ import 'package:get/get.dart';
 import 'core/routes/app_pages.dart';
 import 'core/theme/app_theme.dart';
 
-void main() {
+void main()async {
+ await WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 

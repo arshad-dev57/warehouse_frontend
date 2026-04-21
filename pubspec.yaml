@@ -40,7 +40,19 @@ dependencies:
   http: ^1.6.0
   shared_preferences: ^2.5.4
   image_picker: ^1.2.1
-
+  shimmer: ^3.0.0
+  barcode: ^2.2.9
+  barcode_widget: ^2.0.4
+  mobile_scanner: ^7.2.0
+  path_provider: ^2.1.5
+  screenshot: ^3.0.0
+  pdf: ^3.10.7
+  printing: ^5.11.1
+  share_plus: ^7.2.0
+  flutter_local_notifications: ^17.1.2
+  permission_handler: ^11.0.1
+  intl: ^0.18.1
+  device_info_plus: ^12.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

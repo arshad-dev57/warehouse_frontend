@@ -57,12 +57,35 @@ class OrdersController extends GetxController {
       ]);
 
       orders.value = results[0] as List<OrderModel>;
-      orderCounts.value = results[1] as Map<OrderStatus, int>;
+      
+      // 🔥 FIX: Convert Map<String, int> to Map<OrderStatus, int>
+      final countsMap = results[1] as Map<String, int>;
+      final convertedCounts = <OrderStatus, int>{};
+      
+      countsMap.forEach((key, value) {
+        switch(key) {
+          case 'pending':
+            convertedCounts[OrderStatus.pending] = value;
+            break;
+          case 'processing':
+            convertedCounts[OrderStatus.processing] = value;
+            break;
+          case 'completed':
+            convertedCounts[OrderStatus.completed] = value;
+            break;
+          case 'cancelled':
+            convertedCounts[OrderStatus.cancelled] = value;
+            break;
+        }
+      });
+      
+      orderCounts.value = convertedCounts;
       
       filterOrders();
       
     } catch (e) {
       error.value = e.toString();
+      print('Error loading orders: $e');
     } finally {
       isLoading.value = false;
     }

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:warehouse_management_app/modules/settings/controllers/supplier_controller.dart';
+import 'package:warehouse_management_app/widgets/error_widget.dart';
+import '../../../widgets/loading_widget.dart';
 
 class SuppliersView extends GetView<SuppliersController> {
   const SuppliersView({super.key});
@@ -36,45 +38,32 @@ class SuppliersView extends GetView<SuppliersController> {
         ],
       ),
       body: Obx(() {
-        if (controller.suppliers.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.business_outlined, size: 64, color: Colors.grey.shade300),
-                const SizedBox(height: 16),
-                Text(
-                  'No Suppliers',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Add your first supplier',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: controller.showAddSupplierDialog,
-                  child: const Text('Add Supplier'),
-                ),
-              ],
-            ),
+        if (controller.isLoading.value) {
+          return const LoadingWidget(message: 'Loading suppliers...');
+        }
+        
+        if (controller.error.isNotEmpty) {
+          return errorWidget(
+            message: controller.error.value,
+            onRetry: controller.refreshSuppliers,
           );
         }
+        
+        if (controller.suppliers.isEmpty) {
+          return _buildEmptyState();
+        }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: controller.suppliers.length,
-          itemBuilder: (context, index) {
-            final supplier = controller.suppliers[index];
-            return _buildSupplierCard(supplier);
-          },
+        return RefreshIndicator(
+          onRefresh: controller.refreshSuppliers,
+          color: const Color(0xFF1E1E2F),
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: controller.suppliers.length,
+            itemBuilder: (context, index) {
+              final supplier = controller.suppliers[index];
+              return _buildSupplierCard(supplier);
+            },
+          ),
         );
       }),
     );
@@ -116,11 +105,13 @@ class SuppliersView extends GetView<SuppliersController> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      supplier['name'],
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Text(
+                        supplier['name'],
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -141,40 +132,36 @@ class SuppliersView extends GetView<SuppliersController> {
                     ),
                   ],
                 ),
-                if (supplier['contact'].isNotEmpty) ...[
+                if (supplier['contactPerson'] != null && supplier['contactPerson'].toString().isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
-                    'Contact: ${supplier['contact']}',
+                    'Contact: ${supplier['contactPerson']}',
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       color: Colors.grey.shade600,
                     ),
                   ),
                 ],
-                const SizedBox(height: 2),
-                Text(
-                  supplier['phone'],
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '${supplier['products']} products',
+                if (supplier['phone'] != null && supplier['phone'].toString().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    supplier['phone'],
                     style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: Colors.orange.shade700,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
                     ),
                   ),
-                ),
+                ],
+                if (supplier['email'] != null && supplier['email'].toString().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    supplier['email'],
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -215,6 +202,43 @@ class SuppliersView extends GetView<SuppliersController> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.business_outlined, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            'No Suppliers',
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Add your first supplier',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: controller.showAddSupplierDialog,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E1E2F),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text('Add Supplier'),
           ),
         ],
       ),

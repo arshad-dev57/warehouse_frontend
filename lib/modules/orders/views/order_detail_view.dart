@@ -305,14 +305,14 @@ class OrderDetailsView extends GetView<OrderDetailsController> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '₹${item.price.toStringAsFixed(0)}',
+                '\$${item.price.toStringAsFixed(0)}',
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: Colors.grey.shade600,
                 ),
               ),
               Text(
-                '₹${item.total.toStringAsFixed(0)}',
+                '\$${item.total.toStringAsFixed(0)}',
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -333,15 +333,15 @@ class OrderDetailsView extends GetView<OrderDetailsController> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildSummaryRow('Subtotal', '₹${order.subtotal.toStringAsFixed(0)}'),
+            _buildSummaryRow('Subtotal', '\$${order.subtotal.toStringAsFixed(0)}'),
             const SizedBox(height: 8),
             if (order.discount > 0)
-              _buildSummaryRow('Discount', '- ₹${order.discount.toStringAsFixed(0)}'),
+              _buildSummaryRow('Discount', '- \$${order.discount.toStringAsFixed(0)}'),
             if (order.discount > 0) const SizedBox(height: 8),
             const Divider(),
             _buildSummaryRow(
               'Total',
-              '₹${order.total.toStringAsFixed(0)}',
+              '\$${order.total.toStringAsFixed(0)}',
               isTotal: true,
             ),
           ],
@@ -399,7 +399,7 @@ class OrderDetailsView extends GetView<OrderDetailsController> {
         Expanded(
           child: CustomButton(
             text: 'Process Order',
-            onPressed: () => controller.updateOrderStatus(OrderStatus.processing),
+            onPressed: () => controller.updateOrderStatus(OrderStatus.completed),
             backgroundColor: Colors.blue,
             textColor: Colors.white,
             height: 50,

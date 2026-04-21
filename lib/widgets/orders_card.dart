@@ -34,6 +34,7 @@ class OrderCard extends StatelessWidget {
           ],
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
             Row(
@@ -67,7 +68,9 @@ class OrderCard extends StatelessWidget {
             const SizedBox(height: 12),
             
             // Items summary
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -76,7 +79,7 @@ class OrderCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    '${order.itemCount} items',
+                    '${order.itemCount} item${order.itemCount != 1 ? 's' : ''}',
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -84,7 +87,6 @@ class OrderCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -92,7 +94,7 @@ class OrderCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    '₹${order.total.toStringAsFixed(0)}',
+                    '\$${order.total.toStringAsFixed(0)}',
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -100,6 +102,22 @@ class OrderCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (order.discount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Discount: ₹${order.discount.toStringAsFixed(0)}',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 12),
@@ -117,7 +135,7 @@ class OrderCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${order.orderDate.day}/${order.orderDate.month}/${order.orderDate.year}',
+                      _formatDate(order.orderDate),
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -134,7 +152,7 @@ class OrderCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      order.createdBy,
+                      order.createdBy, // 🔥 Ab name show hoga
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -148,5 +166,9 @@ class OrderCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 }

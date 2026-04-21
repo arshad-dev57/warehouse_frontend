@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:warehouse_management_app/core/contants/app_constants.dart';
 import 'package:warehouse_management_app/data/models/onboarding_models.dart';
 import 'package:warehouse_management_app/modules/onboarding/controllers/onboarding_controllers.dart';
-import 'package:warehouse_management_app/widgets/custom_button.dart';
 
 class OnboardingView extends GetView<OnboardingController> {
   const OnboardingView({super.key});
@@ -89,14 +88,7 @@ class OnboardingView extends GetView<OnboardingController> {
                   ),
                   const SizedBox(width: 16), // Space between buttons
                   
-                  // Create Account Button (Microsoft-style - right)
-                  Expanded(
-                    child: _buildMicrosoftButton(
-                      text: 'Create Account',
-                      onPressed: controller.navigateToSignUp,
-                      isOutlined: false,
-                    ),
-                  ),
+              
                 ],
               ),
             ),

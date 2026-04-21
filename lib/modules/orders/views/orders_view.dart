@@ -7,7 +7,6 @@ import 'package:warehouse_management_app/data/models/order_model.dart';
 import 'package:warehouse_management_app/widgets/custom_button.dart';
 import 'package:warehouse_management_app/widgets/orders_card.dart';
 import '../controllers/orders_controller.dart';
-
 import '../../../widgets/loading_widget.dart';
 import '../../../widgets/error_widget.dart';
 
@@ -40,7 +39,11 @@ class OrdersView extends GetView<OrdersController> {
                 return _buildEmptyState();
               }
 
-              return _buildOrdersList();
+              return RefreshIndicator(
+                onRefresh: controller.refreshOrders,
+                color: const Color(0xFF1E1E2F),
+                child: _buildOrdersList(),
+              );
             }),
           ),
         ],
@@ -113,12 +116,12 @@ class OrdersView extends GetView<OrdersController> {
                     if (tab['status'] != null) ...[
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.all(2),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: isSelected 
                               ? Colors.white.withOpacity(0.3)
-                              : Colors.grey.shade400,
-                          shape: BoxShape.circle,
+                              : status?.color ?? Colors.grey,
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           _getCountForStatus(tab['status'] as OrderStatus).toString(),
@@ -190,53 +193,59 @@ class OrdersView extends GetView<OrdersController> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.receipt_outlined,
-            size: 64,
-            color: Colors.grey.shade300,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Orders Found',
-            style: GoogleFonts.inter(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E1E2F),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.receipt_outlined,
+              size: 64,
+              color: Colors.grey.shade300,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            controller.searchQuery.value.isNotEmpty
-                ? 'No orders match your search'
-                : 'Create your first order',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: Colors.grey.shade600,
+            const SizedBox(height: 16),
+            Text(
+              'No Orders Found',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1E1E2F),
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          if (controller.searchQuery.value.isNotEmpty)
-            CustomButton(
-              text: 'Clear Search',
-              onPressed: () => controller.searchQuery.value = '',
-              backgroundColor: Colors.grey.shade200,
-              textColor: const Color(0xFF1E1E2F),
-              height: 45,
-              borderRadius: 8,
-            )
-          else
-            CustomButton(
-              text: 'Create Order',
-              onPressed: controller.navigateToCreateOrder,
-              backgroundColor: const Color(0xFF1E1E2F),
-              textColor: Colors.white,
-              height: 45,
-              borderRadius: 8,
+            const SizedBox(height: 8),
+            Text(
+              controller.searchQuery.value.isNotEmpty
+                  ? 'No orders match your search'
+                  : 'Create your first order',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
             ),
-        ],
+            const SizedBox(height: 24),
+            if (controller.searchQuery.value.isNotEmpty)
+              CustomButton(
+                text: 'Clear Search',
+                onPressed: () {
+                  controller.searchQuery.value = '';
+                  FocusManager.instance.primaryFocus?.unfocus();
+                },
+                backgroundColor: Colors.grey.shade200,
+                textColor: const Color(0xFF1E1E2F),
+                height: 45,
+                borderRadius: 8,
+              )
+            else
+              CustomButton(
+                text: 'Create Order',
+                onPressed: controller.navigateToCreateOrder,
+                backgroundColor: const Color(0xFF1E1E2F),
+                textColor: Colors.white,
+                height: 45,
+                borderRadius: 8,
+              ),
+          ],
+        ),
       ),
     );
   }

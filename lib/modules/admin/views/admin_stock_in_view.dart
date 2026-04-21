@@ -71,6 +71,7 @@ class StockInView extends GetView<StockInController> {
               controller: controller.quantityController,
               keyboardType: TextInputType.number,
               validator: controller.validateQuantity,
+              enabled: !controller.isSubmitting.value,
               decoration: InputDecoration(
                 hintText: 'Enter quantity',
                 border: OutlineInputBorder(
@@ -95,6 +96,7 @@ class StockInView extends GetView<StockInController> {
             const SizedBox(height: 8),
             TextFormField(
               controller: controller.referenceController,
+              enabled: !controller.isSubmitting.value,
               decoration: InputDecoration(
                 hintText: 'e.g., PO-2025-001',
                 border: OutlineInputBorder(
@@ -120,6 +122,7 @@ class StockInView extends GetView<StockInController> {
             TextFormField(
               controller: controller.notesController,
               maxLines: 3,
+              enabled: !controller.isSubmitting.value,
               decoration: InputDecoration(
                 hintText: 'Add any notes...',
                 border: OutlineInputBorder(
@@ -133,7 +136,7 @@ class StockInView extends GetView<StockInController> {
             // Submit Button
             CustomButton(
               text: 'Add Stock',
-              onPressed: controller.submitStockIn,
+              onPressed: controller.isSubmitting.value ? null : controller.submitStockIn,
               isLoading: controller.isSubmitting.value,
               backgroundColor: Colors.green,
               textColor: Colors.white,
@@ -164,12 +167,26 @@ class StockInView extends GetView<StockInController> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(
+            color: controller.selectedProduct.value == null
+                ? Colors.red.shade300
+                : Colors.grey.shade300,
+          ),
           borderRadius: BorderRadius.circular(12),
+          color: controller.isProductFromDetails.value 
+              ? Colors.green.shade50 
+              : Colors.transparent,
         ),
         child: Row(
           children: [
-            Icon(Icons.search, color: Colors.grey.shade600),
+            Icon(
+              controller.isProductFromDetails.value 
+                  ? Icons.check_circle 
+                  : Icons.search,
+              color: controller.isProductFromDetails.value 
+                  ? Colors.green 
+                  : Colors.grey.shade600,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -184,15 +201,17 @@ class StockInView extends GetView<StockInController> {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
+            if (!controller.isProductFromDetails.value) ...[
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.qr_code_scanner, color: Colors.blue.shade700, size: 20),
               ),
-              child: Icon(Icons.qr_code_scanner, color: Colors.blue.shade700, size: 20),
-            ),
+            ],
           ],
         ),
       ),
@@ -205,9 +224,15 @@ class StockInView extends GetView<StockInController> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: controller.isProductFromDetails.value 
+            ? Colors.green.shade50 
+            : Colors.blue.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(
+          color: controller.isProductFromDetails.value 
+              ? Colors.green.shade200 
+              : Colors.blue.shade200,
+        ),
       ),
       child: Row(
         children: [
@@ -219,7 +244,12 @@ class StockInView extends GetView<StockInController> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
-              child: Icon(Icons.inventory_2_outlined, color: Colors.blue.shade700),
+              child: Icon(
+                Icons.inventory_2_outlined, 
+                color: controller.isProductFromDetails.value 
+                    ? Colors.green.shade700 
+                    : Colors.blue.shade700,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -242,45 +272,79 @@ class StockInView extends GetView<StockInController> {
                     color: Colors.grey.shade600,
                   ),
                 ),
+                if (controller.isProductFromDetails.value)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '✓ Product from details',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 18),
-            onPressed: controller.clearSelectedProduct,
-          ),
+          if (!controller.isProductFromDetails.value)
+            IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              onPressed: controller.clearSelectedProduct,
+            ),
         ],
       ),
     );
   }
 
- // lib/modules/admin/stock/views/stock_in_view.dart
-
-Widget _buildSupplierDropdown() {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    decoration: BoxDecoration(
-      border: Border.all(color: Colors.grey.shade300),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Obx(() => DropdownButton<String>(  // 👈 Type specify
-      value: controller.selectedSupplier.value,
-      hint: const Text('Select supplier'),
-      isExpanded: true,
-      underline: const SizedBox(),
-      icon: const Icon(Icons.arrow_drop_down),
-      items: controller.suppliers.map<DropdownMenuItem<String>>((supplier) {  // 👈 Type specify
-        return DropdownMenuItem<String>(  // 👈 Type specify
-          value: supplier['id'] as String,  // 👈 Type cast
-          child: Text(supplier['name'] as String),  // 👈 Type cast
+  Widget _buildSupplierDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Obx(() {
+        if (controller.isLoadingSuppliers.value) {
+          return const SizedBox(
+            height: 50,
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+        
+        return DropdownButton<String>(
+          value: controller.selectedSupplier.value,
+          hint: const Text('Select supplier'),
+          isExpanded: true,
+          underline: const SizedBox(),
+          icon: const Icon(Icons.arrow_drop_down),
+          items: [
+            const DropdownMenuItem<String>(
+              value: null,
+              child: Text('None'),
+            ),
+            ...controller.suppliers.map<DropdownMenuItem<String>>((supplier) {
+              return DropdownMenuItem<String>(
+                value: supplier['id'].toString(),
+                child: Text(supplier['name'].toString()),
+              );
+            }).toList(),
+          ],
+          onChanged: controller.isSubmitting.value ? null : controller.selectSupplier,
         );
-      }).toList(),
-      onChanged: controller.selectSupplier,
-    )),
-  );
-} Widget _buildDatePicker() {
+      }),
+    );
+  }
+
+  Widget _buildDatePicker() {
     return GestureDetector(
-      onTap: controller.selectDate,
+      onTap: controller.isSubmitting.value ? null : controller.selectDate,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(

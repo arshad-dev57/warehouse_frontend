@@ -17,11 +17,15 @@ class StockHistoryView extends GetView<StockHistoryController> {
       appBar: _buildAppBar(),
       body: Column(
         children: [
-          _buildFilterBar(),
+          _buildSummaryBar(),
           Expanded(
             child: Obx(() {
               if (controller.isLoading.value) {
                 return const LoadingWidget(message: 'Loading history...');
+              }
+              
+              if (controller.error.isNotEmpty) {
+                return _buildErrorWidget();
               }
               
               if (controller.movements.isEmpty) {
@@ -45,7 +49,7 @@ class StockHistoryView extends GetView<StockHistoryController> {
         onPressed: () => Get.back(),
       ),
       title: Text(
-        'Stock History',
+        controller.pageTitle,
         style: GoogleFonts.inter(
           fontSize: 18,
           fontWeight: FontWeight.w700,
@@ -53,74 +57,72 @@ class StockHistoryView extends GetView<StockHistoryController> {
         ),
       ),
       centerTitle: true,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.filter_list_rounded, color: Color(0xFF1E1E2F)),
-          onPressed: _showFilterDialog,
-        ),
-      ],
     );
   }
 
-  Widget _buildFilterBar() {
+  Widget _buildSummaryBar() {
     return Container(
       padding: const EdgeInsets.all(16),
       color: Colors.white,
       child: Row(
         children: [
           Expanded(
-            child: Obx(() {
-              String filterText = 'All Movements';
-              if (controller.selectedType.value != 'all') {
-                filterText = controller.selectedType.value == 'stock_in' 
-                    ? 'Stock In' 
-                    : 'Stock Out';
-              }
-              
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.filter_list, size: 16, color: Colors.blue.shade700),
-                    const SizedBox(width: 8),
-                    Text(
-                      filterText,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: Colors.blue.shade700,
-                        fontWeight: FontWeight.w500,
-                      ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Obx(() => Column(
+                children: [
+                  Text(
+                    'Total Stock In',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: Colors.green.shade700,
                     ),
-                  ],
-                ),
-              );
-            }),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${controller.totalStockIn}',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.green.shade700,
+                    ),
+                  ),
+                ],
+              )),
+            ),
           ),
           const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
-                const SizedBox(width: 8),
-                Text(
-                  'This Month',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: Colors.grey.shade700,
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Obx(() => Column(
+                children: [
+                  Text(
+                    'Total Stock Out',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: Colors.orange.shade700,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    '${controller.totalStockOut}',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.orange.shade700,
+                    ),
+                  ),
+                ],
+              )),
             ),
           ),
         ],
@@ -129,13 +131,34 @@ class StockHistoryView extends GetView<StockHistoryController> {
   }
 
   Widget _buildMovementsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: controller.movements.length,
-      itemBuilder: (context, index) {
-        final movement = controller.movements[index];
-        return _buildMovementCard(movement);
-      },
+    return RefreshIndicator(
+      onRefresh: controller.refreshMovements,
+      color: const Color(0xFF1E1E2F),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (ScrollNotification scrollInfo) {
+          if (!controller.isLoadingMore.value &&
+              scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 100) {
+            controller.loadMore();
+          }
+          return true;
+        },
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: controller.movements.length + (controller.isLoadingMore.value ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == controller.movements.length) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            final movement = controller.movements[index];
+            return _buildMovementCard(movement);
+          },
+        ),
+      ),
     );
   }
 
@@ -143,8 +166,14 @@ class StockHistoryView extends GetView<StockHistoryController> {
     final isStockIn = movement['type'] == 'stock_in';
     final color = isStockIn ? Colors.green : Colors.orange;
     final icon = isStockIn ? Icons.arrow_downward : Icons.arrow_upward;
-    final quantity = movement['quantity'] as int;
-    final date = DateTime.parse(movement['date'] ?? DateTime.now().toIso8601String());
+    final quantity = movement['quantity'] as int? ?? 0;
+    DateTime date;
+    
+    try {
+      date = DateTime.parse(movement['createdAt'] ?? movement['date'] ?? DateTime.now().toIso8601String());
+    } catch (e) {
+      date = DateTime.now();
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -187,7 +216,9 @@ class StockHistoryView extends GetView<StockHistoryController> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -204,40 +235,84 @@ class StockHistoryView extends GetView<StockHistoryController> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    if (movement['reference'] != null && movement['reference'].isNotEmpty)
-                      Text(
-                        movement['reference'],
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
+                    if (movement['reason'] != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          movement['reason'],
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    if (movement['reference'] != null && movement['reference'].toString().isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          movement['reference'],
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.blue.shade700,
+                          ),
                         ),
                       ),
                   ],
                 ),
+                if (movement['notes'] != null && movement['notes'].toString().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      movement['notes'],
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
 
-          // Date
+          // Date and Time
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${date.day}/${date.month}',
+                '${date.day}/${date.month}/${date.year}',
                 style: GoogleFonts.inter(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                '${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+                '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}',
                 style: GoogleFonts.inter(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: Colors.grey.shade500,
                 ),
               ),
+              if (movement['createdBy'] != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    movement['createdBy']['name'] ?? 'System',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                ),
             ],
           ),
         ],
@@ -271,11 +346,41 @@ class StockHistoryView extends GetView<StockHistoryController> {
               fontSize: 14,
               color: Colors.grey.shade600,
             ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline_rounded, size: 64, color: Colors.red.shade300),
+          const SizedBox(height: 16),
+          Text(
+            'Error Loading History',
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF1E1E2F),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            controller.error.value,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
           CustomButton(
-            text: 'Go to Stock In',
-            onPressed: () => Get.toNamed('/admin/stock/in'),
+            text: 'Try Again',
+            onPressed: controller.refreshMovements,
             backgroundColor: const Color(0xFF1E1E2F),
             textColor: Colors.white,
             height: 45,
@@ -283,63 +388,6 @@ class StockHistoryView extends GetView<StockHistoryController> {
           ),
         ],
       ),
-    );
-  }
-
-  void _showFilterDialog() {
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Filter Movements',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Obx(() => Column(
-              children: [
-                _buildFilterOption('All', 'all', controller.selectedType.value),
-                _buildFilterOption('Stock In', 'stock_in', controller.selectedType.value),
-                _buildFilterOption('Stock Out', 'stock_out', controller.selectedType.value),
-              ],
-            )),
-            const SizedBox(height: 20),
-            CustomButton(
-              text: 'Apply Filter',
-              onPressed: () => Get.back(),
-              backgroundColor: const Color(0xFF1E1E2F),
-              textColor: Colors.white,
-              height: 45,
-              borderRadius: 8,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterOption(String label, String value, String selected) {
-    return RadioListTile<String>(
-      title: Text(label),
-      value: value,
-      groupValue: selected,
-      onChanged: (val) {
-        if (val != null) {
-          controller.selectedType.value = val;
-          controller.loadMovements();
-        }
-      },
-      activeColor: const Color(0xFF1E1E2F),
     );
   }
 }

@@ -4,16 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:warehouse_management_app/core/routes/app_pages.dart';
 import 'package:warehouse_management_app/data/reposotories/product_repository.dart';
+import 'package:warehouse_management_app/data/reposotories/stock_repository.dart';
+
 import '../../../../data/models/product_model.dart';
 
 class ProductDetailsController extends GetxController {
-  final ProductRepository _repository;
+  final ProductRepository _productRepository;
+  final StockRepository _stockRepository;
 
-  ProductDetailsController({required ProductRepository repository})
-      : _repository = repository;
+  ProductDetailsController({
+    required ProductRepository productRepository,
+    required StockRepository stockRepository,
+  })  : _productRepository = productRepository,
+        _stockRepository = stockRepository;
 
   // State
   final isLoading = true.obs;
+  final isLoadingHistory = false.obs;
   final error = ''.obs;
   
   // Data
@@ -32,7 +39,7 @@ class ProductDetailsController extends GetxController {
     productId = Get.parameters['productId'];
     if (productId != null) {
       loadProductData(productId!);
-      loadStockHistory();
+      // ❌ loadStockHistory() removed from here - will be called from loadProductData
     } else {
       error.value = 'Product ID not found';
       isLoading.value = false;
@@ -44,55 +51,56 @@ class ProductDetailsController extends GetxController {
       isLoading.value = true;
       error.value = '';
       
-      final data = await _repository.getProductById(id);
+      print("Loading product details for ID: $id");
+      
+      final data = await _productRepository.getProductById(id);
+      
       if (data != null) {
         product.value = data;
+        print("Product loaded: ${data.name}");
+        // ✅ Load stock history after product is loaded
+        await loadStockHistory();
       } else {
         error.value = 'Product not found';
       }
     } catch (e) {
       error.value = e.toString();
+      print('Error loading product: $e');
     } finally {
       isLoading.value = false;
+      print("isLoading set to false");
     }
   }
 
-  void loadStockHistory() {
-    // Mock stock history data
-    stockHistory.value = [
-      {
-        'id': 'h1',
-        'type': 'stock_in',
-        'quantity': 50,
-        'date': DateTime.now().subtract(const Duration(days: 2)),
-        'user': 'Ali Raza',
-        'note': 'New stock received',
-      },
-      {
-        'id': 'h2',
-        'type': 'stock_out',
-        'quantity': 5,
-        'date': DateTime.now().subtract(const Duration(days: 1)),
-        'user': 'Sara Khan',
-        'note': 'Order #123',
-      },
-      {
-        'id': 'h3',
-        'type': 'stock_out',
-        'quantity': 3,
-        'date': DateTime.now(),
-        'user': 'Ahmed Malik',
-        'note': 'Order #124',
-      },
-      {
-        'id': 'h4',
-        'type': 'stock_in',
-        'quantity': 20,
-        'date': DateTime.now(),
-        'user': 'Fatima Ali',
-        'note': 'Return from customer',
-      },
-    ];
+  Future<void> loadStockHistory() async {
+    if (productId == null) return;
+    
+    try {
+      isLoadingHistory.value = true;
+      
+      print("Loading stock history for product: $productId");
+      
+      final result = await _stockRepository.getStockHistory(
+        productId: productId!,
+        page: 1,
+        limit: 5,
+      );
+      
+      print("Stock history result: $result");
+      
+      if (result['success'] == true) {
+        final List<dynamic> data = result['data'] ?? [];
+        stockHistory.value = List<Map<String, dynamic>>.from(data);
+        print("Loaded ${stockHistory.length} history items");
+      } else {
+        print("Failed to load history: ${result['message']}");
+      }
+      
+    } catch (e) {
+      print('Error loading stock history: $e');
+    } finally {
+      isLoadingHistory.value = false;
+    }
   }
 
   void changeImage(int index) {
@@ -101,7 +109,7 @@ class ProductDetailsController extends GetxController {
 
   void navigateToEdit() {
     Get.toNamed(
-      '/admin/products/edit',
+      AppRoutes.AddProduct,
       arguments: {'productId': productId},
     )?.then((result) {
       if (result == true) {
@@ -138,7 +146,9 @@ class ProductDetailsController extends GetxController {
       isLoading.value = true;
       Get.back(); // Close dialog
       
-      final success = await _repository.deleteProduct(productId!);
+      print("Deleting product ID: $productId");
+      
+      final success = await _productRepository.deleteProduct(productId!);
       
       if (success) {
         Get.snackbar(
@@ -148,7 +158,7 @@ class ProductDetailsController extends GetxController {
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
-        Get.back(result: true); // Go back and refresh list
+        Get.back(result: true);
       } else {
         throw Exception('Failed to delete product');
       }
@@ -168,14 +178,20 @@ class ProductDetailsController extends GetxController {
   void navigateToStockIn() {
     Get.toNamed(
       AppRoutes.stockIn,
-      arguments: {'product': product.value},
+      arguments: {
+        'product': product.value,
+        'source': 'product_details'
+      },
     );
   }
 
   void navigateToStockOut() {
     Get.toNamed(
       AppRoutes.stockOut,
-      arguments: {'product': product.value},
+      arguments: {
+        'product': product.value,
+        'source': 'product_details'
+      },
     );
   }
 
@@ -185,7 +201,6 @@ class ProductDetailsController extends GetxController {
       'Printing barcode for ${product.value?.name}',
       snackPosition: SnackPosition.BOTTOM,
     );
-    // Implement barcode printing
   }
 
   void shareProduct() {
@@ -194,7 +209,6 @@ class ProductDetailsController extends GetxController {
       'Sharing product details',
       snackPosition: SnackPosition.BOTTOM,
     );
-    // Implement share functionality
   }
 
   // Helper getters
@@ -212,7 +226,7 @@ class ProductDetailsController extends GetxController {
     if (product.value == null) return '';
     final profit = product.value!.profit;
     final margin = product.value!.profitMargin;
-    return '₹${profit.toStringAsFixed(2)} (${margin.toStringAsFixed(1)}%)';
+    return '\$${profit.toStringAsFixed(2)} (${margin.toStringAsFixed(1)}%)';
   }
 
   Color get profitColor {

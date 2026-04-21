@@ -1,12 +1,10 @@
-// lib/modules/admin/orders/controllers/create_order_controller.dart (Fixed)
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:warehouse_management_app/data/reposotories/oredr_repository.dart';
 import 'package:warehouse_management_app/data/reposotories/product_repository.dart';
+
 import '../../../../data/models/order_model.dart';
 import '../../../../data/models/product_model.dart';
-
 
 class CreateOrderController extends GetxController {
   final OrderRepository _orderRepository;
@@ -31,35 +29,33 @@ class CreateOrderController extends GetxController {
   // State
   final isLoading = false.obs;
   final isSubmitting = false.obs;
+  final isScanning = false.obs; // New: For showing scanning indicator
 
   // Data
   final items = <Map<String, dynamic>>[].obs;
   final products = <ProductModel>[].obs;
+  final recentScans = <String>[].obs; // Store recent barcodes for quick access
   
   // Totals
   final subtotal = 0.0.obs;
-  final discount = 0.0.obs;      // 👈 Observable for discount
+  final discount = 0.0.obs;
   final total = 0.0.obs;
 
   @override
   void onInit() {
     super.onInit();
     loadProducts();
-    
-    // 👈 Discount observable ko listen karo
     ever(discount, (_) => calculateTotal());
   }
 
   @override
   void onReady() {
     super.onReady();
-    // 👈 TextEditingController ko listen karo
     discountController.addListener(_onDiscountChanged);
   }
 
   @override
   void onClose() {
-    // 👈 Listener remove karo
     discountController.removeListener(_onDiscountChanged);
     customerNameController.dispose();
     customerPhoneController.dispose();
@@ -69,7 +65,6 @@ class CreateOrderController extends GetxController {
     super.onClose();
   }
 
-  // 👈 Discount change listener
   void _onDiscountChanged() {
     final value = double.tryParse(discountController.text) ?? 0.0;
     discount.value = value;
@@ -78,15 +73,395 @@ class CreateOrderController extends GetxController {
   Future<void> loadProducts() async {
     try {
       isLoading.value = true;
-      products.value = await _productRepository.getProducts();
+      print("📦 Loading products for order...");
+      products.value = await _productRepository.getProducts(limit: 100);
+      print("✅ Loaded ${products.length} products");
+    } catch (e) {
+      print('❌ Error loading products: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to load products',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     } finally {
       isLoading.value = false;
     }
   }
 
+  // ==================== NEW: BARCODE SEARCH METHOD ====================
+  
+  /// Search product by barcode
+  Future<void> searchProductByBarcode(String barcode) async {
+    print("🔍 Searching for barcode: $barcode");
+    
+    try {
+      isScanning.value = true;
+      
+      // Add to recent scans
+      if (!recentScans.contains(barcode)) {
+        recentScans.add(barcode);
+      }
+      
+      // First check in already loaded products
+      ProductModel? foundProduct = products.firstWhereOrNull(
+        (p) => p.barcode == barcode
+      );
+      
+      // If not found, search from API
+      if (foundProduct == null) {
+        print("🔄 Product not in cache, searching API...");
+        foundProduct = await _productRepository.getProductByBarcode(barcode);
+      }
+      
+      if (foundProduct != null) {
+        print("✅ Product found: ${foundProduct.name}");
+        _showQuantityDialog(foundProduct);
+      } else {
+        print("❌ Product not found for barcode: $barcode");
+        _showProductNotFoundDialog(barcode);
+      }
+      
+    } catch (e) {
+      print('❌ Error searching barcode: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to search product: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      isScanning.value = false;
+    }
+  }
+
+  /// Show quantity dialog for scanned product
+  void _showQuantityDialog(ProductModel product) {
+    final quantityController = TextEditingController(text: '1');
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Add to Order'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Product details
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'SKU: ${product.sku}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Price: ₹${product.sellingPrice}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: product.currentStock > 0 
+                              ? Colors.green.shade100 
+                              : Colors.red.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Stock: ${product.currentStock}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: product.currentStock > 0 
+                                ? Colors.green.shade700 
+                                : Colors.red.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Quantity field
+            TextField(
+              controller: quantityController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Quantity',
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.shopping_cart),
+              ),
+              autofocus: true,
+            ),
+            
+            if (product.currentStock < 5)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '⚠️ Low stock! Only ${product.currentStock} left',
+                  style: TextStyle(
+                    color: Colors.orange.shade700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final quantity = int.tryParse(quantityController.text) ?? 0;
+              
+              if (quantity <= 0) {
+                Get.snackbar('Error', 'Quantity must be greater than 0');
+                return;
+              }
+              
+              if (quantity > product.currentStock) {
+                Get.snackbar(
+                  'Error', 
+                  'Insufficient stock. Available: ${product.currentStock}',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+                return;
+              }
+              
+              addItem(product, quantity);
+              Get.back(); // Close dialog
+              
+              // Show success message
+              Get.snackbar(
+                'Success',
+                '${product.name} added to order',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.green,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 1),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E1E2F),
+            ),
+            child: const Text('Add to Order'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show dialog when product not found
+  void _showProductNotFoundDialog(String barcode) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Product Not Found'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: Colors.red.shade400,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Barcode: $barcode',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'No product found with this barcode',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Would you like to:',
+              style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          OutlinedButton(
+            onPressed: () {
+              Get.back(); // Close this dialog
+              Get.toNamed('/products/add', arguments: {
+                'prefillBarcode': barcode,
+              });
+            },
+            child: const Text('Add New Product'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back(); // Close this dialog
+              _showManualEntryDialog(barcode);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E1E2F),
+            ),
+            child: const Text('Enter Manually'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Manual entry for products not in system
+  void _showManualEntryDialog(String barcode) {
+    final nameController = TextEditingController();
+    final priceController = TextEditingController();
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Add Product Manually'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Product Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: priceController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Price',
+                prefixText: '₹ ',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Barcode: $barcode',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.isEmpty || priceController.text.isEmpty) {
+                Get.snackbar('Error', 'Please fill all fields');
+                return;
+              }
+              
+              final price = double.tryParse(priceController.text) ?? 0;
+              if (price <= 0) {
+                Get.snackbar('Error', 'Invalid price');
+                return;
+              }
+              
+              // Add as temporary item
+              items.add({
+                'id': 'temp_${DateTime.now().millisecondsSinceEpoch}',
+                'name': nameController.text,
+                'sku': 'MANUAL',
+                'price': price,
+                'quantity': 1,
+                'barcode': barcode,
+                'isManual': true,
+              });
+              
+              calculateTotal();
+              Get.back();
+              
+              Get.snackbar(
+                'Success',
+                'Product added manually',
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: Colors.green,
+                colorText: Colors.white,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E1E2F),
+            ),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== EXISTING METHODS (Modified) ====================
+
   void showAddProductDialog() {
     final quantityController = TextEditingController();
     final selectedProduct = Rxn<ProductModel>();
+
+    if (products.isEmpty) {
+      Get.snackbar(
+        'Error',
+        'No products available',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
 
     Get.dialog(
       AlertDialog(
@@ -108,7 +483,7 @@ class CreateOrderController extends GetxController {
                 items: products.map((product) {
                   return DropdownMenuItem(
                     value: product,
-                    child: Text('${product.name} (₹${product.sellingPrice})'),
+                    child: Text('${product.name} - ₹${product.sellingPrice} (Stock: ${product.currentStock})'),
                   );
                 }).toList(),
                 onChanged: (value) => selectedProduct.value = value,
@@ -133,11 +508,22 @@ class CreateOrderController extends GetxController {
           TextButton(
             onPressed: () {
               if (selectedProduct.value != null && quantityController.text.isNotEmpty) {
-                addItem(
-                  selectedProduct.value!,
-                  int.parse(quantityController.text),
-                );
+                final quantity = int.tryParse(quantityController.text) ?? 0;
+                if (quantity <= 0) {
+                  Get.snackbar('Error', 'Quantity must be greater than 0');
+                  return;
+                }
+                if (quantity > selectedProduct.value!.currentStock) {
+                  Get.snackbar(
+                    'Error', 
+                    'Insufficient stock. Available: ${selectedProduct.value!.currentStock}'
+                  );
+                  return;
+                }
+                addItem(selectedProduct.value!, quantity);
                 Get.back();
+              } else {
+                Get.snackbar('Error', 'Please select product and enter quantity');
               }
             },
             child: const Text('Add'),
@@ -148,21 +534,33 @@ class CreateOrderController extends GetxController {
   }
 
   void addItem(ProductModel product, int quantity) {
-    items.add({
-      'id': product.id,
-      'name': product.name,
-      'price': product.sellingPrice,
-      'quantity': quantity,
-    });
-    calculateTotal();
+    final existingIndex = items.indexWhere((item) => item['id'] == product.id);
     
-    Get.snackbar(
-      'Success',
-      'Product added to order',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
-    );
+    if (existingIndex >= 0) {
+      final newQuantity = items[existingIndex]['quantity'] + quantity;
+      if (newQuantity > product.currentStock) {
+        Get.snackbar(
+          'Error',
+          'Total quantity exceeds available stock. Available: ${product.currentStock}',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+      items[existingIndex]['quantity'] = newQuantity;
+    } else {
+      items.add({
+        'id': product.id,
+        'name': product.name,
+        'sku': product.sku,
+        'price': product.sellingPrice,
+        'quantity': quantity,
+        'barcode': product.barcode,
+      });
+    }
+    
+    calculateTotal();
   }
 
   void removeItem(int index) {
@@ -171,15 +569,27 @@ class CreateOrderController extends GetxController {
   }
 
   void calculateTotal() {
-    // Calculate subtotal
     subtotal.value = items.fold(0.0, (sum, item) {
       return sum + (item['price'] * item['quantity']);
     });
-
-    // Calculate total
     total.value = subtotal.value - discount.value;
   }
 
+  // Clear form
+  void _clearForm() {
+    customerNameController.clear();
+    customerPhoneController.clear();
+    customerAddressController.clear();
+    discountController.clear();
+    notesController.clear();
+    items.clear();
+    subtotal.value = 0.0;
+    discount.value = 0.0;
+    total.value = 0.0;
+    print("✅ Form cleared successfully");
+  }
+
+  // Create order
   Future<void> createOrder() async {
     if (!formKey.currentState!.validate()) return;
 
@@ -200,7 +610,7 @@ class CreateOrderController extends GetxController {
       final orderItems = items.map((item) => OrderItem(
         productId: item['id'],
         productName: item['name'],
-        productSku: '', // Will be fetched from product
+        productSku: item['sku'] ?? '',
         quantity: item['quantity'],
         price: item['price'].toDouble(),
       )).toList();
@@ -222,22 +632,29 @@ class CreateOrderController extends GetxController {
         createdAt: DateTime.now(),
       );
 
-      await _orderRepository.createOrder(order);
+      final createdOrder = await _orderRepository.createOrder(order);
+      
+      final orderNumber = createdOrder.orderNumber.isNotEmpty 
+          ? createdOrder.orderNumber 
+          : 'ORD-${DateTime.now().millisecondsSinceEpoch}';
 
       Get.snackbar(
         'Success',
-        'Order created successfully',
+        'Order created successfully. Order #$orderNumber',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.green,
         colorText: Colors.white,
+        duration: const Duration(seconds: 2),
       );
 
+      _clearForm();
       Get.back(result: true);
       
     } catch (e) {
+      print('❌ Create order error: $e');
       Get.snackbar(
         'Error',
-        'Failed to create order: $e',
+        e.toString().replaceAll('Exception:', '').trim(),
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
@@ -245,5 +662,12 @@ class CreateOrderController extends GetxController {
     } finally {
       isSubmitting.value = false;
     }
+  }
+
+  String? validateCustomerName(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Customer name is required';
+    }
+    return null;
   }
 }

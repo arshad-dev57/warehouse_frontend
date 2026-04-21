@@ -89,7 +89,7 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
           _buildStockStatusCard(product),
           const SizedBox(height: 20),
           
-          // Quick Actions
+          // Quick Actions with Navigation
           _buildQuickActions(),
           const SizedBox(height: 20),
           
@@ -138,6 +138,20 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
                   return Image.network(
                     product.imageUrls[index],
                     fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        color: Colors.grey.shade200,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded / 
+                                  loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
                     errorBuilder: (_, __, ___) => Container(
                       color: Colors.grey.shade200,
                       child: Center(
@@ -345,7 +359,7 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
     );
   }
 
-  // MARK: - Quick Actions
+  // MARK: - Quick Actions with Navigation
   Widget _buildQuickActions() {
     return Row(
       children: [
@@ -354,7 +368,16 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
             label: 'Stock In',
             icon: Icons.arrow_downward,
             color: Colors.green,
-            onTap: controller.navigateToStockIn,
+            onTap: () {
+              // Navigate to Stock In with product and source
+              Get.toNamed(
+                AppRoutes.stockIn,
+                arguments: {
+                  'product': controller.product.value,
+                  'source': 'product_details'
+                },
+              );
+            },
           ),
         ),
         const SizedBox(width: 12),
@@ -363,7 +386,16 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
             label: 'Stock Out',
             icon: Icons.arrow_upward,
             color: Colors.orange,
-            onTap: controller.navigateToStockOut,
+            onTap: () {
+              // Navigate to Stock Out with product and source
+              Get.toNamed(
+                AppRoutes.stockOut,
+                arguments: {
+                  'product': controller.product.value,
+                  'source': 'product_details'
+                },
+              );
+            },
           ),
         ),
         const SizedBox(width: 12),
@@ -442,10 +474,10 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
           Row(
             children: [
               Expanded(
-                child: _buildInfoRow('Cost Price', '₹${product.costPrice.toStringAsFixed(2)}'),
+                child: _buildInfoRow('Cost Price', '\$${product.costPrice.toStringAsFixed(2)}'),
               ),
               Expanded(
-                child: _buildInfoRow('Selling Price', '₹${product.sellingPrice.toStringAsFixed(2)}'),
+                child: _buildInfoRow('Selling Price', '\$${product.sellingPrice.toStringAsFixed(2)}'),
               ),
             ],
           ),
@@ -657,7 +689,17 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
                 ),
               ),
               TextButton(
-  onPressed: () => Get.toNamed(AppRoutes.stockHistory),
+                onPressed: () {
+                  if (controller.product.value != null) {
+                    Get.toNamed(
+                      AppRoutes.stockHistory,
+                      arguments: {
+                        'productId': controller.product.value!.id,
+                        'productName': controller.product.value!.name,
+                      },
+                    );
+                  }
+                },
                 child: Text(
                   'View All',
                   style: GoogleFonts.inter(
@@ -669,7 +711,18 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
             ],
           ),
           const SizedBox(height: 12),
+          
+          // History items with loading state
           Obx(() {
+            if (controller.isLoadingHistory.value) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+            
             if (controller.stockHistory.isEmpty) {
               return Center(
                 child: Padding(
@@ -704,6 +757,14 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
   Widget _buildHistoryItem(Map<String, dynamic> movement) {
     final isStockIn = movement['type'] == 'stock_in';
     final color = isStockIn ? Colors.green : Colors.orange;
+    final quantity = movement['quantity'] as int? ?? 0;
+    
+    DateTime date;
+    try {
+      date = DateTime.parse(movement['createdAt'] ?? movement['date'] ?? DateTime.now().toIso8601String());
+    } catch (e) {
+      date = DateTime.now();
+    }
     
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -720,14 +781,14 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
         ),
       ),
       title: Text(
-        '${movement['quantity']} units ${isStockIn ? 'added' : 'removed'}',
+        '$quantity units ${isStockIn ? 'added' : 'removed'}',
         style: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),
       ),
       subtitle: Text(
-        movement['note'] ?? '',
+        movement['reason'] ?? movement['note'] ?? '',
         style: GoogleFonts.inter(
           fontSize: 12,
           color: Colors.grey.shade600,
@@ -738,19 +799,20 @@ class ProductDetailsView extends GetView<ProductDetailsController> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            '${movement['date'].day}/${movement['date'].month}',
+            '${date.day}/${date.month}',
             style: GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
           ),
-          Text(
-            movement['user'],
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              color: Colors.grey.shade500,
+          if (movement['createdBy'] != null)
+            Text(
+              movement['createdBy']['name'] ?? '',
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                color: Colors.grey.shade500,
+              ),
             ),
-          ),
         ],
       ),
     );

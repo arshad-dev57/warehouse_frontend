@@ -1,9 +1,11 @@
 import 'package:get/get.dart';
 import 'package:warehouse_management_app/data/reposotories/product_repository.dart';
+import 'package:warehouse_management_app/data/reposotories/stock_repository.dart';
 
 import 'package:warehouse_management_app/modules/admin/bindings/admin_dashboard_bindings.dart';
 import 'package:warehouse_management_app/modules/admin/bindings/admin_products_binding.dart';
 import 'package:warehouse_management_app/modules/admin/bindings/stock_bindings.dart';
+import 'package:warehouse_management_app/modules/admin/bindings/today_stock_binding.dart';
 import 'package:warehouse_management_app/modules/admin/controller/admin_add_product_controller.dart';
 import 'package:warehouse_management_app/modules/admin/controller/admin_product_details_controller.dart';
 
@@ -14,6 +16,7 @@ import 'package:warehouse_management_app/modules/admin/views/admin_product_list_
 import 'package:warehouse_management_app/modules/admin/views/admin_stock_history_view.dart';
 import 'package:warehouse_management_app/modules/admin/views/admin_stock_in_view.dart';
 import 'package:warehouse_management_app/modules/admin/views/admin_stock_out_view.dart';
+import 'package:warehouse_management_app/modules/admin/views/todays_stock_history_view.dart';
 import 'package:warehouse_management_app/modules/adminreports/bindings/reports_bindings.dart';
 import 'package:warehouse_management_app/modules/adminreports/views/expiry_report_view.dart';
 import 'package:warehouse_management_app/modules/adminreports/views/low_stock_reports.dart';
@@ -27,6 +30,8 @@ import 'package:warehouse_management_app/modules/auth/views/login_view.dart';
 import 'package:warehouse_management_app/modules/auth/views/signup_view.dart';
 
 import 'package:warehouse_management_app/modules/home/views/home_view.dart';
+import 'package:warehouse_management_app/modules/innventory/bindings/inventory_bindings.dart';
+import 'package:warehouse_management_app/modules/innventory/views/inventory_valuation_views.dart';
 
 import 'package:warehouse_management_app/modules/onboarding/bindings/onboarding_bindings.dart';
 import 'package:warehouse_management_app/modules/onboarding/views/onboarding_view.dart';
@@ -34,6 +39,8 @@ import 'package:warehouse_management_app/modules/orders/bindings/order_bindings.
 import 'package:warehouse_management_app/modules/orders/views/create_order_view.dart';
 import 'package:warehouse_management_app/modules/orders/views/order_detail_view.dart';
 import 'package:warehouse_management_app/modules/orders/views/orders_view.dart';
+import 'package:warehouse_management_app/modules/search/bindings/search_product_bindings.dart';
+import 'package:warehouse_management_app/modules/search/views/search_product_view.dart';
 import 'package:warehouse_management_app/modules/settings/bindings/settings_bindings.dart';
 import 'package:warehouse_management_app/modules/settings/views/backup_&_restore_view.dart';
 import 'package:warehouse_management_app/modules/settings/views/category_views.dart';
@@ -42,6 +49,8 @@ import 'package:warehouse_management_app/modules/settings/views/notification_set
 import 'package:warehouse_management_app/modules/settings/views/settings_view.dart';
 import 'package:warehouse_management_app/modules/settings/views/supplier_view.dart';
 import 'package:warehouse_management_app/modules/settings/views/users_view.dart';
+import 'package:warehouse_management_app/modules/staff/bindings/staff_bindings.dart';
+import 'package:warehouse_management_app/modules/staff/views/staff_view.dart';
 
 part 'app_routes.dart';
 
@@ -120,27 +129,39 @@ class AppPages {
       }),
       transition: Transition.rightToLeft,
     ),
-   GetPage(
-      name: AppRoutes.productDetail,
-      page: () => ProductDetailsView(),
-      binding: BindingsBuilder(() {
-        // Ensure repository exists
-        if (!Get.isRegistered<ProductRepository>()) {
-          Get.lazyPut<ProductRepository>(
-            () => ProductRepository(),
-            fenix: true,
-          );
-        }
+  // lib/core/routes/app_pages.dart
 
-        // Only AddProductController bind here
-        Get.lazyPut<ProductDetailsController>(
-          () => ProductDetailsController(
-            repository: Get.find<ProductRepository>(),
-          ),
-        );
-      }),
-      transition: Transition.rightToLeft,
-    ),
+GetPage(
+  name: AppRoutes.productDetail,
+  page: () => ProductDetailsView(),
+  binding: BindingsBuilder(() {
+    // Ensure ProductRepository exists
+    if (!Get.isRegistered<ProductRepository>()) {
+      Get.lazyPut<ProductRepository>(
+        () => ProductRepository(),
+        fenix: true,
+      );
+    }
+    
+    // Ensure StockRepository exists
+    if (!Get.isRegistered<StockRepository>()) {
+      Get.lazyPut<StockRepository>(
+        () => StockRepository(),
+        fenix: true,
+      );
+    }
+
+    // Register ProductDetailsController with both repositories
+    Get.lazyPut<ProductDetailsController>(
+      () => ProductDetailsController(
+        productRepository: Get.find<ProductRepository>(),
+        stockRepository: Get.find<StockRepository>(),
+      ),
+      fenix: true,
+    );
+  }),
+  transition: Transition.rightToLeft,
+),
 GetPage(
   name: AppRoutes.stockIn,
   page: () => const StockInView(),
@@ -164,7 +185,7 @@ GetPage(
 
 GetPage(
   name: AppRoutes.reportsDashboard,
-  page: () => const ReportsDashboardView(),
+  page: () =>  ReportsDashboardView(),
   binding: ReportsBinding(),
   transition: Transition.rightToLeft,
 ),
@@ -172,13 +193,13 @@ GetPage(
 
 GetPage(
   name: AppRoutes.stockSummaryReport,
-  page: () => const StockSummaryReportView(),
+  page: () =>  StockSummaryReportView(),
   binding: ReportsBinding(),
   transition: Transition.rightToLeft,
 ),
 GetPage(
   name: AppRoutes.lowStockReport,
-  page: () => const LowStockReportView(),
+  page: () =>  LowStockReportView(),
   binding: ReportsBinding(),
   transition: Transition.rightToLeft,
 ),
@@ -210,7 +231,7 @@ GetPage(
 
 GetPage(
   name: AppRoutes.users,
-  page: () => const UsersView(),
+  page: () =>  UsersView(),
   binding: SettingsBinding(),
   transition: Transition.rightToLeft,
 ),
@@ -260,6 +281,36 @@ GetPage(
   name: AppRoutes.alerts,
   page: () => const AlertsView(),
   binding: AlertsBinding(),
+  transition: Transition.rightToLeft,
+),
+
+GetPage(
+  name: AppRoutes.staff,
+  page: () =>  StaffView(),
+  binding: StaffBinding(),
+  transition: Transition.rightToLeft,
+),
+GetPage(
+  name: AppRoutes.inventoryValuation,
+  page: () => InventoryValuationView(),
+  binding: InventoryBinding(),
+  transition: Transition.rightToLeft,
+),
+// lib/core/routes/app_pages.dart
+
+
+
+GetPage(
+  name: '/admin/products/search',
+  page: () => const ProductSearchView(),
+  binding: ProductSearchBinding(),
+  transition: Transition.rightToLeft,
+),
+
+GetPage(
+  name: AppRoutes.todayStockHistory,
+  page: () => const TodayStockHistoryView(),
+  binding: TodayStockBinding(),
   transition: Transition.rightToLeft,
 ),
   ];

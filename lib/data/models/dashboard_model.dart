@@ -8,6 +8,9 @@ class DashboardModel {
   final int todayStockIn;
   final int todayStockOut;
   final int pendingOrders;
+  final int outOfStockCount;  // 🔥 NEW
+  final int overstockCount;   // 🔥 NEW
+  final double todayRevenue;  // 🔥 NEW
 
   DashboardModel({
     required this.totalProducts,
@@ -17,6 +20,9 @@ class DashboardModel {
     required this.todayStockIn,
     required this.todayStockOut,
     required this.pendingOrders,
+    this.outOfStockCount = 0,
+    this.overstockCount = 0,
+    this.todayRevenue = 0.0,
   });
 
   factory DashboardModel.fromJson(Map<String, dynamic> json) {
@@ -28,6 +34,9 @@ class DashboardModel {
       todayStockIn: json['todayStockIn'] ?? 0,
       todayStockOut: json['todayStockOut'] ?? 0,
       pendingOrders: json['pendingOrders'] ?? 0,
+      outOfStockCount: json['outOfStockCount'] ?? 0,
+      overstockCount: json['overstockCount'] ?? 0,
+      todayRevenue: (json['todayRevenue'] ?? 0).toDouble(),
     );
   }
 
@@ -40,6 +49,9 @@ class DashboardModel {
       'todayStockIn': todayStockIn,
       'todayStockOut': todayStockOut,
       'pendingOrders': pendingOrders,
+      'outOfStockCount': outOfStockCount,
+      'overstockCount': overstockCount,
+      'todayRevenue': todayRevenue,
     };
   }
 }

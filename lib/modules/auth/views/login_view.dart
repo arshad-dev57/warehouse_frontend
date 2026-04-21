@@ -17,21 +17,7 @@ class LoginView extends GetView<AuthController> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: controller.isLoading.value ? null : () => Get.back(),
-          child: Container(
-            margin: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade200),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.arrow_back,
-              color: Color(0xFF2D2D2D),
-              size: 20,
-            ),
-          ),
-        ),
+      
         title: Text(
           'Welcome Back',
           style: GoogleFonts.inter(
@@ -45,170 +31,75 @@ class LoginView extends GetView<AuthController> {
       body: SafeArea(
         child: Stack(
           children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: controller.loginFormKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Welcome Text - Chhota
-                    const SizedBox(height: 10),
-                    Text(
-                      'Sign in to continue',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Email Field
-                    _buildLabel('Email'),
-                    const SizedBox(height: 6),
-                    AuthTextField(
-                      controller: controller.emailController,
-                      hintText: 'Enter your email',
-                      prefixIcon: Icons.email_outlined,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: controller.validateEmail,
-                      enabled: !controller.isLoading.value,
-                      autoFocus: true,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Password Field
-                    _buildLabel('Password'),
-                    const SizedBox(height: 6),
-                    Obx(() => AuthTextField(
-                      controller: controller.passwordController,
-                      hintText: 'Enter your password',
-                      prefixIcon: Icons.lock_outline,
-                      isPassword: true,
-                      obscureText: !controller.isPasswordVisible.value,
-                      onToggleVisibility: controller.togglePasswordVisibility,
-                      validator: controller.validatePassword,
-                      enabled: !controller.isLoading.value,
-                    )),
-
-                    // Forgot Password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: controller.isLoading.value 
-                            ? null 
-                            : controller.navigateToForgotPassword,
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          'Forgot Password?',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: controller.isLoading.value 
-                                ? Colors.grey.shade400
-                                : const Color(0xFF2D2D2D),
-                          ),
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: controller.loginFormKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Welcome Text - Chhota
+                      const SizedBox(height: 10),
+                      Text(
+                        'Sign in to continue',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
                         ),
                       ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Sign In Button
-                    Obx(() => CustomButton(
-                      text: 'Sign In',
-                      onPressed :() {
-                        Get.offAllNamed(AppRoutes.admindashbaord);
-                      },
-                      // onPressed: controller.isLoading.value ? null : controller.signIn,
-                      isLoading: controller.isLoading.value,
-                      backgroundColor: const Color(0xFF2D2D2D),
-                      textColor: Colors.white,
-                    )),
-
-                    const SizedBox(height: 20),
-
-                    // OR Divider - Compact
-                    Row(
-                      children: [
-                        Expanded(child: Divider(color: Colors.grey.shade300, height: 1)),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            'OR',
-                            style: GoogleFonts.inter(
-                              color: Colors.grey.shade500,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        Expanded(child: Divider(color: Colors.grey.shade300, height: 1)),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Social Sign In - Compact
-                    _buildSocialButton(
-                      icon: Icons.g_mobiledata,
-                      text: 'Google',
-                      onPressed: controller.isLoading.value 
-                          ? null 
-                          : (){},
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    _buildSocialButton(
-                      icon: Icons.apple,
-                      text: 'Apple',
-                      onPressed: controller.isLoading.value 
-                          ? null 
-                          : () {
-                              Get.snackbar(
-                                'Coming Soon',
-                                'Apple Sign In will be available soon',
-                                snackPosition: SnackPosition.BOTTOM,
-                              );
-                            },
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Sign Up Link - Compact
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'New here? ',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: controller.isLoading.value ? null : controller.navigateToSignUp,
-                          child: Text(
-                            'Create Account',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: controller.isLoading.value 
-                                  ? Colors.grey.shade400
-                                  : const Color(0xFF2D2D2D),
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 20),
-                  ],
+                      const SizedBox(height: 24),
+              
+                      // Email Field
+                      _buildLabel('Email'),
+                      const SizedBox(height: 6),
+                      AuthTextField(
+                        controller: controller.emailController,
+                        hintText: 'Enter your email',
+                        prefixIcon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: controller.validateEmail,
+                        enabled: !controller.isLoading.value,
+                        autoFocus: true,
+                      ),
+                      const SizedBox(height: 16),
+              
+                      // Password Field
+                      _buildLabel('Password'),
+                      const SizedBox(height: 6),
+                      Obx(() => AuthTextField(
+                        controller: controller.passwordController,
+                        hintText: 'Enter your password',
+                        prefixIcon: Icons.lock_outline,
+                        isPassword: true,
+                        obscureText: !controller.isPasswordVisible.value,
+                        onToggleVisibility: controller.togglePasswordVisibility,
+                        validator: controller.validatePassword,
+                        enabled: !controller.isLoading.value,
+                      )),
+              
+                      // Forgot Password
+                    
+                      const SizedBox(height: 16),
+              
+                      // Sign In Button
+                      Obx(() => CustomButton(
+                        text: 'Sign In',
+                      
+                        onPressed: controller.isLoading.value ? null : controller.signIn,
+                        isLoading: controller.isLoading.value,
+                        backgroundColor: const Color(0xFF2D2D2D),
+                        textColor: Colors.white,
+                      )),
+              
+                      const SizedBox(height: 20),
+              
+                  
+              
+              
+                     
+                    ],
+                  ),
                 ),
               ),
             ),

@@ -1,4 +1,4 @@
-// lib/modules/admin/dashboard/bindings/admin_dashboard_binding.dart
+// lib/modules/admin/bindings/admin_dashboard_bindings.dart
 
 import 'package:get/get.dart';
 
@@ -6,6 +6,7 @@ import 'package:warehouse_management_app/data/reposotories/chart_repository.dart
 import 'package:warehouse_management_app/data/reposotories/dashboard_repository.dart';
 import 'package:warehouse_management_app/data/reposotories/oredr_repository.dart';
 import 'package:warehouse_management_app/data/reposotories/product_repository.dart';
+import 'package:warehouse_management_app/data/reposotories/stock_repository.dart';
 import 'package:warehouse_management_app/data/services/api_service.dart';
 import 'package:warehouse_management_app/modules/admin/controller/admin_dashboard_controller.dart';
 import 'package:warehouse_management_app/modules/admin/controller/admin_product_list_controller.dart';
@@ -14,7 +15,6 @@ class AdminDashboardBinding extends Bindings {
   @override
   void dependencies() {
     // API Service (already registered)
-    // Get.find<ApiService>() will work
     
     // Product Repository
     Get.lazyPut<ProductRepository>(
@@ -22,9 +22,15 @@ class AdminDashboardBinding extends Bindings {
       fenix: true,
     );
     
-    // Order Repository (for charts)
+    // Order Repository
     Get.lazyPut<OrderRepository>(
       () => OrderRepository(),
+      fenix: true,
+    );
+    
+    // Stock Repository
+    Get.lazyPut<StockRepository>(
+      () => StockRepository(),
       fenix: true,
     );
     
@@ -34,7 +40,7 @@ class AdminDashboardBinding extends Bindings {
       fenix: true,
     );
     
-    // Chart Repository (NEW)
+    // Chart Repository
     Get.lazyPut<ChartRepository>(
       () => ChartRepository(
         productRepository: Get.find<ProductRepository>(),
@@ -53,7 +59,10 @@ class AdminDashboardBinding extends Bindings {
     Get.lazyPut<AdminDashboardController>(
       () => AdminDashboardController(
         dashboardRepository: Get.find<DashboardRepository>(),
-        chartRepository: Get.find<ChartRepository>(),  // 👈 Add this
+        chartRepository: Get.find<ChartRepository>(),
+        productRepository: Get.find<ProductRepository>(),
+        orderRepository: Get.find<OrderRepository>(),
+        stockRepository: Get.find<StockRepository>(),
       ),
       fenix: true,
     );

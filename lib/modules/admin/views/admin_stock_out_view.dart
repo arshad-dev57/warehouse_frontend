@@ -71,6 +71,7 @@ class StockOutView extends GetView<StockOutController> {
               controller: controller.quantityController,
               keyboardType: TextInputType.number,
               validator: controller.validateQuantity,
+              enabled: !controller.isSubmitting.value,
               decoration: InputDecoration(
                 hintText: 'Enter quantity',
                 border: OutlineInputBorder(
@@ -95,6 +96,7 @@ class StockOutView extends GetView<StockOutController> {
             const SizedBox(height: 8),
             TextFormField(
               controller: controller.referenceController,
+              enabled: !controller.isSubmitting.value,
               decoration: InputDecoration(
                 hintText: 'e.g., Order #123',
                 border: OutlineInputBorder(
@@ -120,6 +122,7 @@ class StockOutView extends GetView<StockOutController> {
             TextFormField(
               controller: controller.notesController,
               maxLines: 3,
+              enabled: !controller.isSubmitting.value,
               decoration: InputDecoration(
                 hintText: 'Add any notes...',
                 border: OutlineInputBorder(
@@ -133,7 +136,7 @@ class StockOutView extends GetView<StockOutController> {
             // Submit Button
             CustomButton(
               text: 'Remove Stock',
-              onPressed: controller.submitStockOut,
+              onPressed: controller.isSubmitting.value ? null : controller.submitStockOut,
               isLoading: controller.isSubmitting.value,
               backgroundColor: Colors.orange,
               textColor: Colors.white,
@@ -164,12 +167,26 @@ class StockOutView extends GetView<StockOutController> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(
+            color: controller.selectedProduct.value == null
+                ? Colors.red.shade300
+                : Colors.grey.shade300,
+          ),
           borderRadius: BorderRadius.circular(12),
+          color: controller.isProductFromDetails.value 
+              ? Colors.green.shade50 
+              : Colors.transparent,
         ),
         child: Row(
           children: [
-            Icon(Icons.search, color: Colors.grey.shade600),
+            Icon(
+              controller.isProductFromDetails.value 
+                  ? Icons.check_circle 
+                  : Icons.search,
+              color: controller.isProductFromDetails.value 
+                  ? Colors.green 
+                  : Colors.grey.shade600,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -184,15 +201,17 @@ class StockOutView extends GetView<StockOutController> {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(8),
+            if (!controller.isProductFromDetails.value) ...[
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.qr_code_scanner, color: Colors.orange.shade700, size: 20),
               ),
-              child: Icon(Icons.qr_code_scanner, color: Colors.orange.shade700, size: 20),
-            ),
+            ],
           ],
         ),
       ),
@@ -205,9 +224,15 @@ class StockOutView extends GetView<StockOutController> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
+        color: controller.isProductFromDetails.value 
+            ? Colors.green.shade50 
+            : Colors.orange.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.shade200),
+        border: Border.all(
+          color: controller.isProductFromDetails.value 
+              ? Colors.green.shade200 
+              : Colors.orange.shade200,
+        ),
       ),
       child: Row(
         children: [
@@ -219,7 +244,12 @@ class StockOutView extends GetView<StockOutController> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
-              child: Icon(Icons.inventory_2_outlined, color: Colors.orange.shade700),
+              child: Icon(
+                Icons.inventory_2_outlined, 
+                color: controller.isProductFromDetails.value 
+                    ? Colors.green.shade700 
+                    : Colors.orange.shade700,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -242,13 +272,26 @@ class StockOutView extends GetView<StockOutController> {
                     color: Colors.grey.shade600,
                   ),
                 ),
+                if (controller.isProductFromDetails.value)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '✓ Product from details',
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 18),
-            onPressed: controller.clearSelectedProduct,
-          ),
+          if (!controller.isProductFromDetails.value)
+            IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              onPressed: controller.clearSelectedProduct,
+            ),
         ],
       ),
     );
@@ -273,16 +316,14 @@ class StockOutView extends GetView<StockOutController> {
             child: Text(reason['name'].toString()),
           );
         }).toList(),
-        onChanged: (String? value) {
-          controller.selectReason(value);
-        },
+        onChanged: controller.isSubmitting.value ? null : controller.selectReason,
       )),
     );
   }
 
   Widget _buildDatePicker() {
     return GestureDetector(
-      onTap: controller.selectDate,
+      onTap: controller.isSubmitting.value ? null : controller.selectDate,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(

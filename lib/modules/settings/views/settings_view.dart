@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:warehouse_management_app/modules/settings/controllers/settings_controllers.dart';
+import 'package:warehouse_management_app/modules/staff/views/Roles&Permission_view.dart';
 import 'package:warehouse_management_app/widgets/settings_tile.dart';
 
 class SettingsView extends GetView<SettingsController> {
@@ -121,7 +122,7 @@ class SettingsView extends GetView<SettingsController> {
                 icon: Icons.security_outlined,
                 title: 'Roles & Permissions',
                 subtitle: 'Set user access levels',
-                onTap: () => Get.snackbar('Info', 'Coming soon'),
+                onTap: () => Get.to(RolePermissionsView()),
               ),
             ]),
 

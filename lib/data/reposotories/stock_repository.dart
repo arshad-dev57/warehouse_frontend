@@ -1,95 +1,222 @@
-// lib/data/repositories/stock_repository.dart
+  // lib/data/repositories/stock_repository.dart
 
-import 'package:get/get.dart';
+  import 'dart:convert';
+  import 'package:get/get.dart';
+  import 'package:http/http.dart' as http;
+  import 'package:shared_preferences/shared_preferences.dart';
+  import 'package:warehouse_management_app/data/services/api_service.dart';
 
-class StockRepository extends GetxService {
-  
-  // Mock stock movements - pehle se kuch data daal do
-  final List<Map<String, dynamic>> _movements = [
-    {
-      'id': 'mov1',
-      'productId': 'p1',
-      'productName': 'iPhone 14 Case',
-      'type': 'stock_in',
-      'quantity': 50,
-      'reason': 'Purchase',
-      'reference': 'PO-001',
-      'date': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-      'notes': 'New stock received',
-      'userId': 'user1',
-      'createdAt': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-    },
-    {
-      'id': 'mov2',
-      'productId': 'p2',
-      'productName': 'Paracetamol',
-      'type': 'stock_out',
-      'quantity': 20,
-      'reason': 'Sale',
-      'reference': 'ORD-123',
-      'date': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-      'notes': 'Customer order',
-      'userId': 'user1',
-      'createdAt': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-    },
-    {
-      'id': 'mov3',
-      'productId': 'p1',
-      'productName': 'iPhone 14 Case',
-      'type': 'stock_out',
-      'quantity': 5,
-      'reason': 'Sale',
-      'reference': 'ORD-124',
-      'date': DateTime.now().toIso8601String(),
-      'notes': '',
-      'userId': 'user2',
-      'createdAt': DateTime.now().toIso8601String(),
-    },
-  ];
+  class StockRepository extends GetxService {
+    final ApiService _apiService = Get.find<ApiService>();
 
-  Future<void> addMovement(Map<String, dynamic> movement) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    _movements.add({
-      ...movement,
-      'id': 'mov${_movements.length + 1}',
-      'createdAt': DateTime.now().toIso8601String(),
-    });
-  }
+    String get baseUrl => _apiService.baseUrl;
 
-  Future<List<Map<String, dynamic>>> getMovements({
-    String? productId,
-    String? type,
-    DateTime? fromDate,
-    DateTime? toDate,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    
-    var filtered = List<Map<String, dynamic>>.from(_movements);
-    
-    if (productId != null) {
-      filtered = filtered.where((m) => m['productId'] == productId).toList();
+    Future<String?> _getToken() async {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      return prefs.getString('auth_token');
     }
-    
-    if (type != null && type != 'all') {
-      filtered = filtered.where((m) => m['type'] == type).toList();
-    }
-    
-    // Sort by date (newest first)
-    filtered.sort((a, b) {
-      final dateA = DateTime.parse(a['date'] ?? a['createdAt']);
-      final dateB = DateTime.parse(b['date'] ?? b['createdAt']);
-      return dateB.compareTo(dateA);
-    });
-    
-    return filtered;
-  }
 
-  Future<Map<String, dynamic>> getMovementById(String id) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    try {
-      return _movements.firstWhere((m) => m['id'] == id);
-    } catch (e) {
-      throw Exception('Movement not found');
+    Future<Map<String, String>> _getHeaders() async {
+      final token = await _getToken();
+      return {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+    }
+
+    // ✅ STOCK IN API
+    Future<Map<String, dynamic>> addStock({
+      required String productId,
+      required int quantity,
+      required String reason,
+      String? supplierId,
+      String? supplierName,
+      String? reference,
+      String? notes,
+    }) async {
+      try {
+        final headers = await _getHeaders();
+        
+        final body = {
+          'productId': productId,
+          'quantity': quantity,
+          'reason': reason,
+          if (supplierId != null) 'supplierId': supplierId,
+          if (supplierName != null) 'supplierName': supplierName,
+          if (reference != null) 'reference': reference,
+          if (notes != null) 'notes': notes,
+        };
+
+        print("===== STOCK IN API CALL =====");
+        print("URL: $baseUrl/stock/in");
+        print("Body: $body");
+
+        final response = await http.post(
+          Uri.parse('$baseUrl/stock/in'),
+          headers: headers,
+          body: jsonEncode(body),
+        );
+
+        print("Status: ${response.statusCode}");
+        print("Response: ${response.body}");
+
+        if (response.statusCode == 201) {
+          return jsonDecode(response.body);
+        } else {
+          final error = jsonDecode(response.body);
+          throw Exception(error['message'] ?? 'Failed to add stock');
+        }
+      } catch (e) {
+        print('Error adding stock: $e');
+        throw Exception('Failed to add stock: $e');
+      }
+    }
+
+    // ✅ STOCK OUT API
+    Future<Map<String, dynamic>> removeStock({
+      required String productId,
+      required int quantity,
+      required String reason,
+      String? reference,
+      String? notes,
+    }) async {
+      try {
+        final headers = await _getHeaders();
+        
+        final body = {
+          'productId': productId,
+          'quantity': quantity,
+          'reason': reason,
+          if (reference != null) 'reference': reference,
+          if (notes != null) 'notes': notes,
+        };
+
+        print("===== STOCK OUT API CALL =====");
+        print("URL: $baseUrl/stock/out");
+        print("Body: $body");
+
+        final response = await http.post(
+          Uri.parse('$baseUrl/stock/out'),
+          headers: headers,
+          body: jsonEncode(body),
+        );
+
+        print("Status: ${response.statusCode}");
+        print("Response: ${response.body}");
+
+        if (response.statusCode == 201) {
+          return jsonDecode(response.body);
+        } else {
+          final error = jsonDecode(response.body);
+          throw Exception(error['message'] ?? 'Failed to remove stock');
+        }
+      } catch (e) {
+        print('Error removing stock: $e');
+        throw Exception('Failed to remove stock: $e');
+      }
+    }
+
+    // ✅ GET STOCK HISTORY FOR A SPECIFIC PRODUCT
+    Future<Map<String, dynamic>> getStockHistory({
+      required String productId,
+      int page = 1,
+      int limit = 20,
+    }) async {
+      try {
+        final headers = await _getHeaders();
+        
+        final uri = Uri.parse('$baseUrl/stock/history/$productId').replace(
+          queryParameters: {
+            'page': page.toString(),
+            'limit': limit.toString(),
+          },
+        );
+
+        print("===== GET STOCK HISTORY =====");
+        print("URL: $uri");
+
+        final response = await http.get(uri, headers: headers);
+
+        print("Status: ${response.statusCode}");
+        print("Response: ${response.body}");
+
+        if (response.statusCode == 200) {
+          return jsonDecode(response.body);
+        } else {
+          return {
+            'success': false,
+            'data': [], 
+            'pagination': {'page': page, 'limit': limit, 'total': 0, 'pages': 1}
+          };
+        }
+      } catch (e) {
+        print('Error getting stock history: $e');
+        return {
+          'success': false,
+          'data': [], 
+          'pagination': {'page': page, 'limit': limit, 'total': 0, 'pages': 1}
+        };
+      }
+    }
+
+    // ✅ GET ALL STOCK HISTORY (FOR DASHBOARD) - NEW METHOD
+    Future<List<Map<String, dynamic>>> getAllStockHistory({
+      int page = 1,
+      int limit = 100,
+    }) async {
+      try {
+        final headers = await _getHeaders();
+        
+        final uri = Uri.parse('$baseUrl/stock/history/all').replace(
+          queryParameters: {
+            'page': page.toString(),
+            'limit': limit.toString(),
+          },
+        );
+
+        print("===== GET ALL STOCK HISTORY =====");
+        print("URL: $uri");
+
+        final response = await http.get(uri, headers: headers);
+
+        print("Status: ${response.statusCode}");
+        print("Response: ${response.body}");
+
+        if (response.statusCode == 200) {
+          final jsonData = jsonDecode(response.body);
+          return List<Map<String, dynamic>>.from(jsonData['data'] ?? []);
+        } else {
+          return [];
+        }
+      } catch (e) {
+        print('Error getting all stock history: $e');
+        return [];
+      }
+    }
+
+    // ✅ GET SUPPLIERS LIST
+    Future<List<Map<String, dynamic>>> getSuppliers() async {
+      try {
+        final headers = await _getHeaders();
+        final response = await http.get(
+          Uri.parse('$baseUrl/suppliers'),
+          headers: headers,
+        );
+
+        print("===== GET SUPPLIERS =====");
+        print("Status: ${response.statusCode}");
+        print("Response: ${response.body}");
+
+        if (response.statusCode == 200) {
+          final jsonData = jsonDecode(response.body);
+          return List<Map<String, dynamic>>.from(jsonData['data']);
+        } else {
+          return [];
+        }
+      } catch (e) {
+        print('Error loading suppliers: $e');
+        return [];
+      }
     }
   }
-}
